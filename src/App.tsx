@@ -57,6 +57,7 @@ function App() {
   const [completed, setCompleted] = useState<{
     [k: number]: boolean;
   }>({});
+  const [token, setToken] = useState<string | null>(null);
 
   const [procedureId, healthOperator] = useWatch({
     control,
@@ -70,7 +71,6 @@ function App() {
       setHealthOperators(healthOperators);
     }
   }, [procedure]);
-  console.log("====>", procedureId);
   const totalSteps = () => {
     return steps.length;
   };
@@ -112,11 +112,14 @@ function App() {
   };
 
   const create = (data: any) => {
-    console.log("data", data);
+    if (selectedSlot === null) return;
+    const b = new Date(selectedSlot);
+    const offset = new Date().getTimezoneOffset();
+    b.setMinutes(b.getMinutes() - offset);
+
     api
-      .createAppointment(data)
+      .createAppointment({ ...data, date: b }, token)
       .then((response) => {
-        console.log(response);
         Swal.fire({
           title: "Agendamento realizado com sucesso",
           confirmButtonText: "Fechar",
@@ -125,9 +128,14 @@ function App() {
           allowOutsideClick: () => !Swal.isLoading(),
         });
         resetForm();
+        api.getOneTimeToken().then((response) => {
+          setToken(response.access_token);
+          setProcedures(response.procedures);
+          setWorkingHours(response.working_hours);
+          setAppointments(response.appointments);
+        });
       })
       .catch((error) => {
-        console.log(error);
         Swal.fire({
           title: "Erro ao realizar agendamento. Tente novamente mais tarde.",
           text: error,
@@ -149,7 +157,6 @@ function App() {
         });
         return;
       }
-      console.log("submiting");
       handleSubmit(create)();
       return;
     }
@@ -167,7 +174,7 @@ function App() {
 
   useEffect(() => {
     api.getOneTimeToken().then((response) => {
-      console.log(response);
+      setToken(response.access_token);
       setProcedures(response.procedures);
       setWorkingHours(response.working_hours);
       setAppointments(response.appointments);
@@ -175,7 +182,6 @@ function App() {
   }, []);
 
   const handleSelectSlot = (slot: Date) => {
-    console.log(slot);
     setSelectedSlot(slot);
   };
 

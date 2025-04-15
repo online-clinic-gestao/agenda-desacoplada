@@ -1,5 +1,9 @@
 export const CONFIG = {
-  DOCTOR_ID: import.meta.env.VITE_DOCTOR_ID,
   WHITELABEL_LOGO: import.meta.env.VITE_WHITELABEL_LOGO,
   ENVIRONMENT: import.meta.env.VITE_ENVIRONMENT,
+  AUTHORIZATION_ENDPOINT: import.meta.env.VITE_AUTHORIZATION_ENDPOINT,
+  DEVELOPMENT_ENDPOINT: import.meta.env.VITE_DEVELOPMENT_ENDPOINT,
+  X_API_KEY: import.meta.env.VITE_API_KEY,
+  DOCTOR_ID: import.meta.env.VITE_DOCTOR_ID,
+  CLINIC_ID: import.meta.env.VITE_CLINIC_ID,
 };

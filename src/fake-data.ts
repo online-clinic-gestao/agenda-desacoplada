@@ -1,11 +1,7 @@
 import { OneTimeTokenResponse } from "./types";
 
 export const oneTimeResponse: OneTimeTokenResponse = {
-  token: {
-    access_token: "fake_access_token",
-    expires_in: 3600,
-  },
-
+  access_token: "fake_access_token",
   procedures: [
     {
       id: "1",
@@ -34,13 +30,13 @@ export const oneTimeResponse: OneTimeTokenResponse = {
   working_hours: [
     {
       weekday: 6,
-      start: "09:00",
-      end: "18:00",
+      start: "09:00:00",
+      end: "18:00:00",
     },
     {
       weekday: 0,
-      start: "12:00",
-      end: "18:00",
+      start: "12:00:00",
+      end: "18:00:00",
     },
   ],
 };

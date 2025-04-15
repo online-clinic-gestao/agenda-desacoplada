@@ -1,7 +1,7 @@
 export type Procedure = {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   time: number;
   price: number;
   health_operators: HealthOperator[];
@@ -24,10 +24,7 @@ export type WorkingHours = {
 };
 
 export type OneTimeTokenResponse = {
-  token: {
-    access_token: string;
-    expires_in: number;
-  };
+  access_token: string;
   procedures: Procedure[];
   appointments: Appointments[];
   working_hours: WorkingHours[];

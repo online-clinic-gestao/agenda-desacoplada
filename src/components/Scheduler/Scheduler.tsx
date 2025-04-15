@@ -37,14 +37,15 @@ const Scheduler: React.FC<SchedulerProps> = ({
       if (!timeInterval || !procedure) return [];
       // get day in format YYYY-MM-DD
       const date = day.toISOString().split("T")[0];
-      const start = new Date(`${date}T${timeInterval.start}:00`);
-      const end = new Date(`${date}T${timeInterval.end}:00`);
+      const start = new Date(`${date}T${timeInterval.start}`);
+      const end = new Date(`${date}T${timeInterval.end}`);
       const slots: Date[] = [];
       for (
         let moving = new Date(start);
         moving < end;
         moving.setMinutes(moving.getMinutes() + procedure.time)
       ) {
+        if (moving < new Date()) continue;
         if (
           !appointments.some((appointment) => {
             const appointmentStart = new Date(appointment.start);
@@ -75,7 +76,7 @@ const Scheduler: React.FC<SchedulerProps> = ({
 
   const generateDays = (currentDate: Date) => {
     const days: Date[] = [];
-    const startOfWeek = currentDate.getDate() - 2;
+    const startOfWeek = currentDate.getDate();
     for (let i = 0; i < 5; i++) {
       const day = new Date(currentDate);
       day.setDate(startOfWeek + i);
