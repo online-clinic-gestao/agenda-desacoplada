@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
-import { DoctorCard } from "./components/DoctorCard/DoctorCard";
 import Typography from "@mui/material/Typography";
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
@@ -23,8 +22,21 @@ import Swal from "sweetalert2";
 import { CONFIG } from "./config";
 
 const steps = ["Dados Pessoais", "Agendamento", "Conclusão"];
+type AppProps = {
+  logo_url?: string;
+  authorization_endpoint?: string;
+  environment?: string;
+};
+const App: React.FC<AppProps> = ({
+  logo_url,
+  authorization_endpoint,
+  environment,
+}) => {
+  if (logo_url) CONFIG.WHITELABEL_LOGO = logo_url;
+  if (authorization_endpoint)
+    CONFIG.AUTHORIZATION_ENDPOINT = authorization_endpoint;
+  if (environment) CONFIG.ENVIRONMENT = environment;
 
-function App() {
   const {
     register,
     handleSubmit,
@@ -92,7 +104,7 @@ function App() {
       isLastStep() && !allStepsCompleted()
         ? // It's the last step, but not all steps have been completed,
           // find the first step that has been completed
-          steps.findIndex((step, i) => !(i in completed))
+          steps.findIndex((_, i) => !(i in completed))
         : activeStep + 1;
     setActiveStep(newActiveStep);
   };
@@ -119,7 +131,7 @@ function App() {
 
     api
       .createAppointment({ ...data, date: b }, token)
-      .then((response) => {
+      .then(() => {
         Swal.fire({
           title: "Agendamento realizado com sucesso",
           confirmButtonText: "Fechar",
@@ -363,6 +375,6 @@ function App() {
       </Box>
     </>
   );
-}
+};
 
 export default App;
