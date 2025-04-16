@@ -1,6 +1,6 @@
 {
   "name": "agenda-desacoplada",
-  "version": "0.0.3",
+  "version": "0.0.5",
   "type": "module",
   "main": "dist/esm/decoupled-agenda.cjs.js",
   "module": "dist/esm/decoupled-agenda.es.js",
@@ -9,8 +9,10 @@
     "import": "./dist/decoupled-agenda.js",
     "default": "./dist/decoupled-agenda.iife.js"
   },
+  "types": "./src/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src/index.d.ts"
   ],
   "scripts": {
     "dev": "vite",
