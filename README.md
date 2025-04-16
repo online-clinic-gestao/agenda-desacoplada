@@ -38,6 +38,22 @@ Por fim, basta renderizar e passar as propriedades
 
 ## VanillaJS
 
+Caso você não utilize nenhum framework javascript, você pode integrar ao seu fluxo inserindo a tag script:
+
+```html
+<script src="https://unpkg.com/agenda-desacoplada/dist/iife/decoupled-agenda.iife.js"></script>
+```
+
+Vai ser criado um componente web novo chamado `decoupled-agenda`. Você pode utiliza-lo da mesma forma:
+
+```html
+<decoupled-agenda
+  logo_url=""
+  authorization_endpoint="http://localhost:8080/api/v1/auth/one-time-token/"
+  environment="SANDBOX"
+/>
+```
+
 # Servidor de Autorização
 
 Para utilizar nossa agenda, você precisa implmeentar no lado do servidor, a solicitação de autorização para poder gravar na agenda. Segue alguns exemplos de como pode ser feito:
