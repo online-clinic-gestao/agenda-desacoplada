@@ -22,7 +22,7 @@ import Swal from "sweetalert2";
 import { CONFIG } from "./config";
 
 const steps = ["Dados Pessoais", "Agendamento", "Conclusão"];
-type AppProps = {
+export type AppProps = {
   logo_url?: string;
   authorization_endpoint?: string;
   environment?: string;

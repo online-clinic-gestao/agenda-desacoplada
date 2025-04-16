@@ -8,55 +8,107 @@ Nós possuímos dois ambientes para utilização. O primeiro é `SANDBOX` e o se
 
 # Utilização
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## React
 
-Currently, two official plugins are available:
+Se você utiliza uma aplicação React, você pode instalar nosso componente utilizando
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-});
+```shell
+yarn add agenda-desacoplada
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Em seguida, importe o componente
 
 ```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    "react-x": reactX,
-    "react-dom": reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs["recommended-typescript"].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-});
+import Agenda from "agenda-desacoplada";
 ```
+
+Por fim, basta renderizar e passar as propriedades
+
+```ts
+<Agenda
+  logo_url=""
+  authorization_endpoint="http://localhost:8080/api/v1/auth/one-time-token/"
+  environment="SANDBOX"
+/>
+```
+
+- **logo_url** - Você pode customizar a agenda com a sua própria marca passando uma URL de uma imagem
+- **authorization_endpoint** - Endpoint do qual a aplicação vai capturar o token. Você precisa implementa-lo de maneira segura. Na próxima seção explicamos como você pode fazer isso.
+- **environment** - `SANDBOX | PRODUCTION` Use os valores para alterar entre o ambiente de homologação e produção.
+
+## VanillaJS
+
+# Servidor de Autorização
+
+Para utilizar nossa agenda, você precisa implmeentar no lado do servidor, a solicitação de autorização para poder gravar na agenda. Segue alguns exemplos de como pode ser feito:
+
+### cUrl
+
+```sh
+curl --location --request GET 'https://app.onlineclinic.com.br/api/v1/auth/one-time-token/' \
+--header 'X-API-KEY: your-api-key' \
+--header 'Content-Type: application/json' \
+--data '{
+    "doctor_id": 1,
+    "clinic_id": 1,
+}'
+```
+
+### Python
+
+```python
+import requests
+import json
+
+url = "https://app.onlineclinic.com.br/api/v1/auth/one-time-token/"
+
+payload = json.dumps({
+  "doctor_id": 1
+  "clinic_id": 1,
+})
+headers = {
+  'X-API-KEY': 'your-api-key',
+  'Content-Type': 'application/json',
+}
+
+response = requests.request("GET", url, headers=headers, data=payload)
+
+print(response.text)
+```
+
+### Node
+
+```ts
+const axios = require("axios");
+let data = JSON.stringify({
+  doctor_id: 1,
+  clinic_id: 1,
+});
+
+let config = {
+  method: "get",
+  maxBodyLength: Infinity,
+  url: "https://app.onlineclinic.com.br/api/v1/auth/one-time-token/",
+  headers: {
+    "X-API-KEY": "your-api-key",
+    "Content-Type": "application/json",
+  },
+  data: data,
+};
+
+axios
+  .request(config)
+  .then((response) => {
+    console.log(JSON.stringify(response.data));
+  })
+  .catch((error) => {
+    console.log(error);
+  });
+```
+
+O payload de resposta deve ser devolvido, e o resto da aplicação vai lidar com ele diretamente.
+
+Observe que temos diferentes urls para nossos ambientes:
+
+- Produção: https://app.onlineclinic.com.br
+- Homologação: https://hml.onlineclinic.com.br

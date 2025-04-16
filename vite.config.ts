@@ -7,10 +7,11 @@ export default defineConfig({
   plugins: [react()],
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/register.ts"),
+      entry: path.resolve(__dirname, "src/App.tsx"),
       name: "DecoupledAgenda",
-      fileName: "decoupled-agenda",
-      formats: ["iife"],
+      fileName: (format) =>
+        format === "iife" ? "decoupled-agenda.iife.js" : "decoupled-agenda.js",
+      formats: ["es", "iife"],
     },
     rollupOptions: {
       external: ["react", "react-dom"],

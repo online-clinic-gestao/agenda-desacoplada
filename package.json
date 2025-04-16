@@ -1,7 +1,16 @@
 {
   "name": "agenda-desacoplada",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
+  "main": "dist/decoupled-agenda.iife.js",
+  "module": "dist/decoupled-agenda.js",
+  "exports": {
+    "import": "./dist/decoupled-agenda.js",
+    "default": "./dist/decoupled-agenda.iife.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
