@@ -10,6 +10,7 @@ const App = reactToWebComponent(MainApp, React, ReactDOM, {
     authorization_endpoint: "string",
     environment: "string",
     development_endpoint: "string",
+    api_key: "string",
   },
 });
 customElements.define("decoupled-agenda", App);
