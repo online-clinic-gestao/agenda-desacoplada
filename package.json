@@ -1,13 +1,19 @@
 {
   "name": "agenda-desacoplada",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "type": "module",
   "main": "dist/esm/decoupled-agenda.cjs.js",
   "module": "dist/esm/decoupled-agenda.es.js",
   "browser": "dist/iife/decoupled-agenda.iife.js",
   "exports": {
-    "import": "./dist/decoupled-agenda.js",
-    "default": "./dist/decoupled-agenda.iife.js"
+    ".": {
+      "import": "./dist/esm/decoupled-agenda.es.js",
+      "require": "./dist/esm/decoupled-agenda.cjs.js",
+      "types": "./src/index.d.ts"
+    },
+    "./element": {
+      "default": "./dist/iife/decoupled-agenda.iife.js"
+    }
   },
   "types": "./src/index.d.ts",
   "scripts": {
