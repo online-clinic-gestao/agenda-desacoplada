@@ -4,5 +4,12 @@ import reactToWebComponent from "react-to-webcomponent";
 import MainApp from "./App";
 
 // Registra como Web Component
-const App = reactToWebComponent(MainApp, React, ReactDOM);
+const App = reactToWebComponent(MainApp, React, ReactDOM, {
+  props: {
+    logo_url: "string",
+    authorization_endpoint: "string",
+    environment: "string",
+    development_endpoint: "string",
+  },
+});
 customElements.define("decoupled-agenda", App);

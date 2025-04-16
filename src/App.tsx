@@ -26,16 +26,19 @@ export type AppProps = {
   logo_url?: string;
   authorization_endpoint?: string;
   environment?: string;
+  development_endpoint?: string;
 };
 const App: React.FC<AppProps> = ({
   logo_url,
   authorization_endpoint,
   environment,
+  development_endpoint,
 }) => {
   if (logo_url) CONFIG.WHITELABEL_LOGO = logo_url;
   if (authorization_endpoint)
     CONFIG.AUTHORIZATION_ENDPOINT = authorization_endpoint;
   if (environment) CONFIG.ENVIRONMENT = environment;
+  if (development_endpoint) CONFIG.DEVELOPMENT_ENDPOINT = development_endpoint;
 
   const {
     register,

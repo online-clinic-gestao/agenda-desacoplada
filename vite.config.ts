@@ -2,19 +2,30 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-// https://vite.dev/config/
+const isIifeBuild = process.env.BUILD_TARGET === "iife";
+
 export default defineConfig({
   plugins: [react()],
+  define: isIifeBuild
+    ? {
+        "process.env.NODE_ENV": JSON.stringify("production"),
+      }
+    : {},
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/App.tsx"),
+      entry: isIifeBuild
+        ? path.resolve(__dirname, "src/register.ts")
+        : path.resolve(__dirname, "src/App.tsx"),
       name: "DecoupledAgenda",
+      formats: isIifeBuild ? ["iife"] : ["es", "cjs"],
       fileName: (format) =>
-        format === "iife" ? "decoupled-agenda.iife.js" : "decoupled-agenda.js",
-      formats: ["es", "iife"],
+        isIifeBuild
+          ? `decoupled-agenda.iife.js`
+          : `decoupled-agenda.${format}.js`,
     },
+    outDir: isIifeBuild ? "dist/iife" : "dist/esm",
     rollupOptions: {
-      external: ["react", "react-dom"],
+      external: isIifeBuild ? [] : ["react", "react-dom"],
       output: {
         globals: {
           react: "React",

@@ -1,9 +1,10 @@
 {
   "name": "agenda-desacoplada",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
-  "main": "dist/decoupled-agenda.iife.js",
-  "module": "dist/decoupled-agenda.js",
+  "main": "dist/esm/decoupled-agenda.cjs.js",
+  "module": "dist/esm/decoupled-agenda.es.js",
+  "browser": "dist/iife/decoupled-agenda.iife.js",
   "exports": {
     "import": "./dist/decoupled-agenda.js",
     "default": "./dist/decoupled-agenda.iife.js"
@@ -13,7 +14,9 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && npm run build:esm && npm run build:iife",
+    "build:esm": "vite build",
+    "build:iife": "BUILD_TARGET=iife vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
