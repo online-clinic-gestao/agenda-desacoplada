@@ -1,6 +1,6 @@
 {
   "name": "agenda-desacoplada",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "type": "module",
   "main": "dist/esm/decoupled-agenda.cjs.js",
   "module": "dist/esm/decoupled-agenda.es.js",
@@ -22,7 +22,8 @@
     "build:esm": "vite build",
     "build:iife": "BUILD_TARGET=iife vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "publish": "yarn build && npm publish"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
