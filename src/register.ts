@@ -11,6 +11,8 @@ const App = reactToWebComponent(MainApp, React, ReactDOM, {
     environment: "string",
     development_endpoint: "string",
     api_key: "string",
+    doctor_id: "string",
+    clinic_id: "string",
   },
 });
 customElements.define("decoupled-agenda", App);
