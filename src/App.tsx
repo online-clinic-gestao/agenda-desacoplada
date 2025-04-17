@@ -44,7 +44,7 @@ const App: React.FC<AppProps> = ({
   if (authorization_endpoint)
     CONFIG.AUTHORIZATION_ENDPOINT = authorization_endpoint;
   if (environment) CONFIG.ENVIRONMENT = environment;
-  if (development_endpoint) {
+  if (environment === "DEVELOPMENT") {
     if (development_endpoint)
       CONFIG.DEVELOPMENT_ENDPOINT = development_endpoint;
     if (api_key) CONFIG.X_API_KEY = api_key;
