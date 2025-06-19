@@ -77,10 +77,13 @@ const Scheduler: React.FC<SchedulerProps> = ({
   const generateDays = (currentDate: Date) => {
     const days: Date[] = [];
     const startOfWeek = currentDate.getDate();
-    for (let i = 0; i < 5; i++) {
+    let daysAdd = 0;
+    for (let i = 0; i < 5; daysAdd++) {
       const day = new Date(currentDate);
-      day.setDate(startOfWeek + i);
+      day.setDate(startOfWeek + daysAdd);
+      if(getSlots(day).length === 0) continue; // Skip days with no slots
       days.push(day);
+      i++;
     }
     return days;
   };
