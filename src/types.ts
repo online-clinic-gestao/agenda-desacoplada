@@ -28,4 +28,8 @@ export type OneTimeTokenResponse = {
   procedures: Procedure[];
   appointments: Appointments[];
   working_hours: WorkingHours[];
+  // OLC-1070: quantos horarios oferecer por dia. Ausente ou null = sem limite, que e' o
+  // caso de toda clinica que nao configurou o recurso -- a tela segue mostrando a grade
+  // inteira, exatamente como antes.
+  max_slots_per_day?: number | null;
 };

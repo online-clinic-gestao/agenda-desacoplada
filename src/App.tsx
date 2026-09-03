@@ -80,6 +80,9 @@ const App: React.FC<AppProps> = ({
   const [healthOperators, setHealthOperators] = useState<HealthOperator[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
   const [appointments, setAppointments] = useState<Appointments[]>([]);
+  // OLC-1070: quantos horarios oferecer por dia. `null` = sem limite (clinica sem o
+  // parametro configurado), e a tela segue mostrando a grade inteira.
+  const [maxSlotsPerDay, setMaxSlotsPerDay] = useState<number | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [completed, setCompleted] = useState<{
     [k: number]: boolean;
@@ -160,6 +163,10 @@ const App: React.FC<AppProps> = ({
           setProcedures(response.procedures);
           setWorkingHours(response.working_hours);
           setAppointments(response.appointments);
+          // OLC-1070: tambem aqui, e nao so na carga inicial -- este e' o refetch de DEPOIS
+          // de agendar. Esquecer este ponto faria a tela voltar a grade inteira assim que o
+          // paciente marcasse o primeiro horario.
+          setMaxSlotsPerDay(response.max_slots_per_day ?? null);
         });
       })
       .catch((error) => {
@@ -205,6 +212,7 @@ const App: React.FC<AppProps> = ({
       setProcedures(response.procedures);
       setWorkingHours(response.working_hours);
       setAppointments(response.appointments);
+      setMaxSlotsPerDay(response.max_slots_per_day ?? null);
     });
   }, []);
 
@@ -299,6 +307,7 @@ const App: React.FC<AppProps> = ({
           onSelect={handleSelectSlot}
           procedure={procedure}
           selectedSlot={selectedSlot}
+          maxSlotsPerDay={maxSlotsPerDay}
         />
       </>
     );
