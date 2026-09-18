@@ -29,14 +29,25 @@ const Scheduler: React.FC<SchedulerProps> = ({
       }, {}),
     [workingHours]
   );
+
   const getSlots = useCallback(
     (day: Date) => {
-      day.setMinutes(day.getMinutes() - offset);
-      const timeInterval = workingDaysMap[day.getDay()];
-      console.log("PERIOD D", day.toISOString(), workingDaysMap, day.getDay());
-      if (!timeInterval || !procedure) return [];
+      // Create a copy to avoid mutating the original date
+      const dayForCalculation = new Date(day);
+      dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
+      const timeInterval = workingDaysMap[dayForCalculation.getDay()];
+
+      console.log(
+        "PERIOD D",
+        dayForCalculation.toISOString(),
+        workingDaysMap,
+        dayForCalculation.getDay()
+      );
+      if (!timeInterval || !procedure) {
+        return [];
+      }
       // get day in format YYYY-MM-DD
-      const date = day.toISOString().split("T")[0];
+      const date = dayForCalculation.toISOString().split("T")[0];
       const start = new Date(`${date}T${timeInterval.start}`);
       const end = new Date(`${date}T${timeInterval.end}`);
       const slots: Date[] = [];
@@ -72,21 +83,64 @@ const Scheduler: React.FC<SchedulerProps> = ({
     },
     [appointments, procedure, workingDaysMap]
   );
-  if (!procedure) return null;
+
+  const findFirstAvailableDate = (date: Date) => {
+    const maxDate = new Date(date.getFullYear(), date.getMonth() + 3, 0);
+    while (date <= maxDate) {
+      const slots = getSlots(date);
+
+      if (slots.length > 0) {
+        setCurrentDate(date);
+        return date;
+      }
+      date.setDate(date.getDate() + 1);
+    }
+    return null;
+  };
+
+  const findPreviousAvailableDate = (date: Date) => {
+    const minDate = new Date(date.getFullYear(), date.getMonth() - 3, 1);
+    while (date >= minDate) {
+      const slots = getSlots(date);
+
+      if (slots.length > 0) {
+        setCurrentDate(date);
+        return date;
+      }
+      date.setDate(date.getDate() - 1);
+    }
+    return null;
+  };
 
   const generateDays = (currentDate: Date) => {
     const days: Date[] = [];
     const startOfWeek = currentDate.getDate();
     let daysAdd = 0;
-    for (let i = 0; i < 5; daysAdd++) {
+    let loopCount = 0;
+    const maxLoops = 50; // Safety limit to prevent infinite loops
+
+    for (let i = 0; i < 5 && loopCount < maxLoops; daysAdd++, loopCount++) {
       const day = new Date(currentDate);
       day.setDate(startOfWeek + daysAdd);
-      if(getSlots(day).length === 0) continue; // Skip days with no slots
+
+      const daySlots = getSlots(new Date(day)); // Create a copy to avoid mutation
+
+      if (daySlots.length === 0) {
+        continue; // Skip days with no slots
+      }
+
       days.push(day);
       i++;
     }
+
+    if (loopCount >= maxLoops) {
+      console.warn("🚨 DEBUG: generateDays hit maximum loop limit!");
+    }
+
     return days;
   };
+
+  if (!procedure) return null;
 
   const subtractDays = (date: Date, days: number) => {
     const result = new Date(date);
@@ -104,7 +158,12 @@ const Scheduler: React.FC<SchedulerProps> = ({
         }}
       >
         <Box>
-          <Button onClick={() => setCurrentDate(subtractDays(currentDate, 1))}>
+          <Button
+            onClick={() => {
+              const newDate = subtractDays(currentDate, 1);
+              findPreviousAvailableDate(newDate);
+            }}
+          >
             <KeyboardArrowLeft />
           </Button>
         </Box>
@@ -175,7 +234,13 @@ const Scheduler: React.FC<SchedulerProps> = ({
           ))}
         </Box>
         <Box>
-          <Button onClick={() => setCurrentDate(subtractDays(currentDate, -1))}>
+          <Button
+            onClick={() => {
+              const newDate = subtractDays(currentDate, -1);
+
+              findFirstAvailableDate(newDate);
+            }}
+          >
             <KeyboardArrowRight />
           </Button>
         </Box>
