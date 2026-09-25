@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import "./App.css";
 import Typography from "@mui/material/Typography";
 import FormControl from "@mui/material/FormControl";
@@ -141,6 +142,19 @@ const App: React.FC<AppProps> = ({
     reset();
   };
 
+  // Carrega (ou recarrega) token, procedimentos e grade. Usado na abertura da tela e
+  // depois de cada tentativa de agendar -- com sucesso ou recusa --, para que o
+  // `max_slots_per_day` (OLC-1070) e os ocupados nunca fiquem desatualizados.
+  const loadOneTimeToken = () => {
+    api.getOneTimeToken().then((response) => {
+      setToken(response.access_token);
+      setProcedures(response.procedures);
+      setWorkingHours(response.working_hours);
+      setAppointments(response.appointments);
+      setMaxSlotsPerDay(response.max_slots_per_day ?? null);
+    });
+  };
+
   const create = (data: any) => {
     if (selectedSlot === null) return;
     const b = new Date(selectedSlot);
@@ -158,24 +172,34 @@ const App: React.FC<AppProps> = ({
           allowOutsideClick: () => !Swal.isLoading(),
         });
         resetForm();
-        api.getOneTimeToken().then((response) => {
-          setToken(response.access_token);
-          setProcedures(response.procedures);
-          setWorkingHours(response.working_hours);
-          setAppointments(response.appointments);
-          // OLC-1070: tambem aqui, e nao so na carga inicial -- este e' o refetch de DEPOIS
-          // de agendar. Esquecer este ponto faria a tela voltar a grade inteira assim que o
-          // paciente marcasse o primeiro horario.
-          setMaxSlotsPerDay(response.max_slots_per_day ?? null);
-        });
+        loadOneTimeToken();
       })
       .catch((error) => {
+        // OLC-1070: a rota explica a recusa em `message` ("Este horario nao esta mais
+        // disponivel...", bloqueio, conflito). Antes a tela mostrava so' o
+        // `AxiosError: Request failed with status code 400`.
+        const data = axios.isAxiosError(error) ? error.response?.data : undefined;
+        const message =
+          typeof data?.message === "string" ? data.message : undefined;
+        const isRejected =
+          axios.isAxiosError(error) && error.response?.status === 400;
         Swal.fire({
-          title: "Erro ao realizar agendamento. Tente novamente mais tarde.",
-          text: error,
+          title: isRejected
+            ? "Não foi possível realizar o agendamento"
+            : "Erro ao realizar agendamento. Tente novamente mais tarde.",
+          text: message ?? String(error),
           icon: "error",
           confirmButtonText: "Fechar",
         });
+        // Com o limite por dia, a grade muda quando outro paciente agenda ou cancela: a
+        // tela antiga continuaria oferecendo o horario que a rota acabou de recusar.
+        // Recarrega sempre; na recusa (400) o horario escolhido deixa de valer e o
+        // paciente volta para o passo "Agendamento" para escolher outro.
+        loadOneTimeToken();
+        if (isRejected) {
+          setSelectedSlot(null);
+          setActiveStep(1);
+        }
       });
   };
 
@@ -207,13 +231,7 @@ const App: React.FC<AppProps> = ({
   };
 
   useEffect(() => {
-    api.getOneTimeToken().then((response) => {
-      setToken(response.access_token);
-      setProcedures(response.procedures);
-      setWorkingHours(response.working_hours);
-      setAppointments(response.appointments);
-      setMaxSlotsPerDay(response.max_slots_per_day ?? null);
-    });
+    loadOneTimeToken();
   }, []);
 
   const handleSelectSlot = (slot: Date) => {

@@ -40,13 +40,6 @@ const Scheduler: React.FC<SchedulerProps> = ({
       const dayForCalculation = new Date(day);
       dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
       const timeInterval = workingDaysMap[dayForCalculation.getDay()];
-
-      console.log(
-        "PERIOD D",
-        dayForCalculation.toISOString(),
-        workingDaysMap,
-        dayForCalculation.getDay()
-      );
       if (!timeInterval || !procedure) {
         return [];
       }
@@ -101,7 +94,7 @@ const Scheduler: React.FC<SchedulerProps> = ({
       //
       // Sem o parametro (`undefined`/`null`/<=0) nada e' cortado: a clinica que nao pediu o
       // recurso continua vendo a grade inteira, byte a byte como antes.
-      if (maxSlotsPerDay && maxSlotsPerDay > 0)
+      if (maxSlotsPerDay != null && maxSlotsPerDay > 0)
         return slots.slice(0, maxSlotsPerDay);
 
       return slots;
