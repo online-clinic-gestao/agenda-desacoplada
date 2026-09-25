@@ -55,9 +55,13 @@ const Scheduler: React.FC<SchedulerProps> = ({
       const start = new Date(`${date}T${timeInterval.start}`);
       const end = new Date(`${date}T${timeInterval.end}`);
       const slots: Date[] = [];
+      // OLC-1070: o horario tem de CABER inteiro no expediente, e nao so' comecar antes do
+      // fim. E' a mesma conta do backend (`slots_livres`, `slot_inicio + passo <= fim`),
+      // que confere a gravacao: com `moving < end` a tela oferecia, p.ex., 11:45 num
+      // expediente ate 12:00 com procedimento de 45min, e a rota recusava.
       for (
         let moving = new Date(start);
-        moving < end;
+        moving.getTime() + procedure.time * 60000 <= end.getTime();
         moving.setMinutes(moving.getMinutes() + procedure.time)
       ) {
         if (moving < new Date()) continue;
