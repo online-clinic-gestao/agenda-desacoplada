@@ -10,6 +10,9 @@ type SchedulerProps = {
   appointments: Appointments[];
   procedure: Procedure | undefined;
   selectedSlot?: Date | null;
+  // OLC-1070: quantos horarios oferecer por dia. `undefined`/`null`/<=0 = sem limite, que
+  // e' o caso de toda clinica que nao configurou o recurso.
+  maxSlotsPerDay?: number | null;
 };
 
 const Scheduler: React.FC<SchedulerProps> = ({
@@ -18,6 +21,7 @@ const Scheduler: React.FC<SchedulerProps> = ({
   appointments,
   procedure,
   selectedSlot,
+  maxSlotsPerDay,
 }) => {
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const offset = new Date().getTimezoneOffset();
@@ -36,13 +40,6 @@ const Scheduler: React.FC<SchedulerProps> = ({
       const dayForCalculation = new Date(day);
       dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
       const timeInterval = workingDaysMap[dayForCalculation.getDay()];
-
-      console.log(
-        "PERIOD D",
-        dayForCalculation.toISOString(),
-        workingDaysMap,
-        dayForCalculation.getDay()
-      );
       if (!timeInterval || !procedure) {
         return [];
       }
@@ -51,9 +48,13 @@ const Scheduler: React.FC<SchedulerProps> = ({
       const start = new Date(`${date}T${timeInterval.start}`);
       const end = new Date(`${date}T${timeInterval.end}`);
       const slots: Date[] = [];
+      // OLC-1070: o horario tem de CABER inteiro no expediente, e nao so' comecar antes do
+      // fim. E' a mesma conta do backend (`slots_livres`, `slot_inicio + passo <= fim`),
+      // que confere a gravacao: com `moving < end` a tela oferecia, p.ex., 11:45 num
+      // expediente ate 12:00 com procedimento de 45min, e a rota recusava.
       for (
         let moving = new Date(start);
-        moving < end;
+        moving.getTime() + procedure.time * 60000 <= end.getTime();
         moving.setMinutes(moving.getMinutes() + procedure.time)
       ) {
         if (moving < new Date()) continue;
@@ -79,9 +80,26 @@ const Scheduler: React.FC<SchedulerProps> = ({
         )
           slots.push(new Date(moving));
       }
+
+      // OLC-1070: a clinica pode limitar quantos horarios o paciente ve por dia, para os
+      // agendamentos ficarem colados e o medico nao ficar ocioso entre um e outro.
+      //
+      // O corte e' o ULTIMO passo, sobre a lista ja filtrada: sao os N primeiros horarios
+      // LIVRES do dia. Cortar antes de remover os ocupados ofereceria horario indisponivel.
+      //
+      // Aqui, e nao no backend, porque a contagem depende da duracao do procedimento que o
+      // paciente escolheu (`procedure.time`) -- o `one-time-token` responde antes dessa
+      // escolha e so consegue delimitar uma JANELA de tempo. Com o corte aqui sao sempre N,
+      // qualquer que seja a duracao.
+      //
+      // Sem o parametro (`undefined`/`null`/<=0) nada e' cortado: a clinica que nao pediu o
+      // recurso continua vendo a grade inteira, byte a byte como antes.
+      if (maxSlotsPerDay != null && maxSlotsPerDay > 0)
+        return slots.slice(0, maxSlotsPerDay);
+
       return slots;
     },
-    [appointments, procedure, workingDaysMap]
+    [appointments, procedure, workingDaysMap, maxSlotsPerDay]
   );
 
   const findFirstAvailableDate = (date: Date) => {
