@@ -19,6 +19,30 @@ export type SlotRules = {
 // Limite de dias que o `generateDays` percorre procurando 5 dias com horario.
 const GENERATE_DAYS_MAX_LOOPS = 50;
 
+// OLC-1364: ate quantos dias a frente de hoje a tela oferece horario.
+//
+// O `one-time-token` so' informa os ocupados de amanha ate hoje+61
+// (`_get_appointments_hours`, no consultorio). Dali em diante a tela nao sabe o que esta
+// ocupado e mostraria tudo como livre -- e a rota de gravacao nao confere conflito com
+// agendamento existente, entao gravaria por cima. Antes so' a seta ">" chegava la; com a
+// grade abrindo sozinha na 1a data livre, o medico lotado cairia direto nesse trecho.
+//
+// 60, e nao 61: um dia de folga para a tela que ficou aberta de um dia para o outro (os
+// ocupados sao os de quando o token foi carregado) e para relogio/fuso do paciente
+// diferente do servidor.
+export const MAX_DAYS_AHEAD = 60;
+
+const lastOfferedMoment = (now: Date) =>
+  new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + MAX_DAYS_AHEAD,
+    23,
+    59,
+    59,
+    999
+  );
+
 export const buildWorkingDaysMap = (workingHours: WorkingHours[]): WorkingDaysMap =>
   workingHours.reduce((acc: WorkingDaysMap, curr) => {
     acc[curr.weekday] = curr;
@@ -29,6 +53,9 @@ export const getSlots = (day: Date, rules: SlotRules): Date[] => {
   const { workingDaysMap, appointments, procedure, maxSlotsPerDay } = rules;
   const now = rules.now ?? new Date();
   const offset = now.getTimezoneOffset();
+  // OLC-1364: alem de `MAX_DAYS_AHEAD` nao ha horario. Aqui, e nao nas buscas, para que a
+  // abertura, as setas e as colunas da grade parem no mesmo dia.
+  if (day > lastOfferedMoment(now)) return [];
   // Create a copy to avoid mutating the original date
   const dayForCalculation = new Date(day);
   dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
@@ -86,7 +113,8 @@ export const getSlots = (day: Date, rules: SlotRules): Date[] => {
 };
 
 // Primeira data com horario a partir de `from` (inclusive), ate o ultimo dia do mes de
-// `from` + 2. `null` se nao houver.
+// `from` + 2 -- e nunca alem de `MAX_DAYS_AHEAD`, que o `getSlots` aplica. `null` se nao
+// houver.
 export const findNextAvailableDate = (from: Date, rules: SlotRules): Date | null => {
   const date = new Date(from);
   const maxDate = new Date(date.getFullYear(), date.getMonth() + 3, 0);
@@ -111,7 +139,8 @@ export const findPreviousAvailableDate = (from: Date, rules: SlotRules): Date | 
 
 // Ate 5 dias com horario a partir de `start` (inclusive), percorrendo no maximo
 // `GENERATE_DAYS_MAX_LOOPS` dias. Bater o limite nao e' erro (OLC-1364): a grade parte de
-// uma data com horario e so' mostra menos colunas quando a agenda do medico e' rala.
+// uma data com horario e so' mostra menos colunas quando a agenda do medico e' rala ou
+// quando chega em `MAX_DAYS_AHEAD`.
 export const generateDays = (start: Date, rules: SlotRules): Date[] => {
   const days: Date[] = [];
   const startOfWeek = start.getDate();

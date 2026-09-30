@@ -89,13 +89,9 @@ describe("Scheduler", () => {
         appointments: CONCON_APPOINTMENTS,
       });
 
-      expect(offeredDays()).toEqual([
-        "2026-11-16",
-        "2026-11-23",
-        "2026-11-30",
-        "2026-12-07",
-        "2026-12-14",
-      ]);
+      // So' as segundas ate hoje + 60 dias (24/11): dali em diante a tela nao sabe o que
+      // esta ocupado.
+      expect(offeredDays()).toEqual(["2026-11-16", "2026-11-23"]);
     });
 
     it("CA3: medico com horario nos proximos dias -> mesma grade de antes", () => {
@@ -135,7 +131,8 @@ describe("Scheduler", () => {
       const slots = offeredSlots();
       expect(ymd(slots)[0]).toEqual("2026-11-16");
       expect(hhmm(slots.slice(0, 2))).toEqual(["08:30", "09:00"]);
-      expect(slots).toHaveLength(5 * 2);
+      // 16/11 e 23/11 (a janela de 60 dias acaba em 24/11), 2 horarios em cada.
+      expect(slots).toHaveLength(2 * 2);
       for (let i = 2; i < slots.length; i += 2)
         expect(hhmm(slots.slice(i, i + 2))).toEqual(["08:00", "08:30"]);
     });
@@ -155,13 +152,42 @@ describe("Scheduler", () => {
     });
 
     it("tudo ocupado no periodo que a tela alcanca -> mensagem", () => {
-      // Segundas cheias ate 30/11; de 25/09 a busca vai ate 29/11.
+      // Segundas cheias ate 30/11; de 25/09 a tela vai ate 24/11 (hoje + 60 dias).
       renderScheduler({
         workingHours: [expedient(MONDAY)],
         appointments: busyWeekly(at(2026, 9, 28), at(2026, 11, 30)),
       });
 
       expect(screen.getByText(NO_SLOTS)).toBeInTheDocument();
+    });
+
+    it("1a data livre alem de hoje + 60 dias -> mensagem, e a seta nao chega nela", () => {
+      // Medico so' de quarta, com as quartas cheias ate 18/11: a 1a livre (25/11) fica a 61
+      // dias, fora da janela de ocupados do backend. Nada e' ocupado dali em diante, mas a
+      // tela nao tem como saber.
+      const WEDNESDAY = 3;
+      const { offeredSlots } = renderScheduler({
+        workingHours: [expedient(WEDNESDAY)],
+        appointments: busyWeekly(at(2026, 9, 30), at(2026, 11, 18)),
+      });
+
+      expect(screen.getByText(NO_SLOTS)).toBeInTheDocument();
+
+      clickArrow("Right");
+      clickArrow("Right");
+
+      expect(screen.getByText(NO_SLOTS)).toBeInTheDocument();
+      expect(offeredSlots()).toEqual([]);
+    });
+
+    it("1a data livre exatamente em hoje + 60 dias -> abre nela", () => {
+      const TUESDAY = 2;
+      const { offeredDays } = renderScheduler({
+        workingHours: [expedient(TUESDAY)],
+        appointments: busyWeekly(at(2026, 9, 29), at(2026, 11, 17)),
+      });
+
+      expect(offeredDays()).toEqual(["2026-11-24"]);
     });
 
     it("clicar nas setas sem horario nao quebra e mantem a mensagem", () => {
@@ -213,6 +239,10 @@ describe("Scheduler", () => {
 
       clickArrow("Right");
       expect(offeredDays()[0]).toEqual("2026-11-23");
+
+      // 30/11 ja passa de hoje + 60 dias: a seta nao sai do lugar.
+      clickArrow("Right");
+      expect(offeredDays()).toEqual(["2026-11-23"]);
     });
   });
 

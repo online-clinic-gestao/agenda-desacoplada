@@ -89,6 +89,19 @@ describe("getSlots", () => {
       .toEqual([]);
     expect(getSlots(at(2026, 9, 29), rulesFor([expedient(MONDAY)]))).toEqual([]);
   });
+
+  it("oferece ate hoje + 60 dias, e nada depois (janela de ocupados do backend)", () => {
+    // De NOW (25/09), hoje + 60 = terca 24/11; quarta 25/11 ja fica fora.
+    const TUESDAY = 2;
+    const WEDNESDAY = 3;
+    const rules = rulesFor([expedient(TUESDAY), expedient(WEDNESDAY)]);
+
+    expect(getSlots(at(2026, 11, 24), rules)).toHaveLength(4);
+    // Mesmo com a data carregando uma hora mais tarde que a de NOW.
+    expect(getSlots(at(2026, 11, 24, 23, 30), rules)).toHaveLength(4);
+    expect(getSlots(at(2026, 11, 25), rules)).toEqual([]);
+    expect(getSlots(at(2026, 11, 25, 0, 0), rules)).toEqual([]);
+  });
 });
 
 describe("generateDays", () => {
@@ -119,13 +132,21 @@ describe("generateDays", () => {
     });
 
     expect(generateDays(NOW, rules)).toEqual([]);
-    // Partindo da 1a data livre, a grade sai normalmente.
+    // Partindo da 1a data livre, a grade sai -- ate hoje + 60 dias (24/11).
     expect(ymd(generateDays(at(2026, 11, 16), rules))).toEqual([
       "2026-11-16",
       "2026-11-23",
-      "2026-11-30",
-      "2026-12-07",
-      "2026-12-14",
+    ]);
+  });
+
+  it("nao mostra coluna alem de hoje + 60 dias", () => {
+    const rules = rulesFor([1, 2, 3, 4, 5].map((weekday) => expedient(weekday)));
+
+    // De sexta 20/11 caberiam 5 dias uteis; a janela acaba na terca 24/11.
+    expect(ymd(generateDays(at(2026, 11, 20), rules))).toEqual([
+      "2026-11-20",
+      "2026-11-23",
+      "2026-11-24",
     ]);
   });
 });
@@ -148,19 +169,41 @@ describe("findNextAvailableDate (seta >)", () => {
     expect(ymd([findNextAvailableDate(NOW, rules)!])).toEqual(["2026-11-16"]);
   });
 
-  it("vai ate o ultimo dia do mes + 2, exclusive quando a data tem hora: de 25/09 10:00, ate 29/11", () => {
-    // O teto e' 30/11 00:00 e a busca carrega a hora de `from`, entao 30/11 10:00 ja passa
-    // dele. Comportamento de antes do OLC-1364, mantido.
-    const SUNDAY = 0;
-    // 29/11/2026 e' domingo; 30/11/2026, segunda.
-    const busySundays = busyWeekly(at(2026, 9, 27), at(2026, 11, 22));
-    const sundays = rulesFor([expedient(SUNDAY)], { appointments: busySundays });
-    const mondays = rulesFor([expedient(MONDAY)], {
-      appointments: busyWeekly(MONDAY_2026_09_28, at(2026, 11, 23)),
+  it("nao acha data alem de hoje + 60 dias", () => {
+    // De NOW (25/09), hoje + 60 = terca 24/11. O teto do mes + 2 (29/11) iria mais longe.
+    const TUESDAY = 2;
+    const WEDNESDAY = 3;
+    const tuesdays = rulesFor([expedient(TUESDAY)], {
+      appointments: busyWeekly(at(2026, 9, 29), at(2026, 11, 17)),
+    });
+    const wednesdays = rulesFor([expedient(WEDNESDAY)], {
+      appointments: busyWeekly(at(2026, 9, 30), at(2026, 11, 18)),
     });
 
-    expect(ymd([findNextAvailableDate(NOW, sundays)!])).toEqual(["2026-11-29"]);
-    expect(findNextAvailableDate(NOW, mondays)).toBeNull();
+    expect(ymd([findNextAvailableDate(NOW, tuesdays)!])).toEqual(["2026-11-24"]);
+    // A 1a quarta livre seria 25/11, a 61 dias.
+    expect(findNextAvailableDate(NOW, wednesdays)).toBeNull();
+  });
+
+  it("vai ate o ultimo dia do mes + 2, exclusive quando a data tem hora: de 31/12 10:00, ate 27/02", () => {
+    // O teto e' 28/02 00:00 e a busca carrega a hora de `from`, entao 28/02 10:00 ja passa
+    // dele. Comportamento de antes do OLC-1364, mantido. De 31/12 o teto do mes (27/02, a
+    // 58 dias) fica aquem dos 60 dias (01/03), entao e' ele que manda.
+    const now = at(2026, 12, 31, 10);
+    const SUNDAY = 0;
+    const SATURDAY = 6;
+    // 27/02/2027 e' sabado; 28/02/2027, domingo.
+    const saturdays = rulesFor([expedient(SATURDAY)], {
+      now,
+      appointments: busyWeekly(at(2027, 1, 2), at(2027, 2, 20)),
+    });
+    const sundays = rulesFor([expedient(SUNDAY)], {
+      now,
+      appointments: busyWeekly(at(2027, 1, 3), at(2027, 2, 21)),
+    });
+
+    expect(ymd([findNextAvailableDate(now, saturdays)!])).toEqual(["2027-02-27"]);
+    expect(findNextAvailableDate(now, sundays)).toBeNull();
   });
 
   it("nao altera a data recebida", () => {
