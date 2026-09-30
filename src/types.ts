@@ -20,7 +20,7 @@ export type Appointments = {
 export type WorkingHours = {
   start: string;
   end: string;
-  weekday: number; // 0 - monday/ 6 - sunday
+  weekday: number; // 0 - sunday / 6 - saturday (como `Date.getDay()` e o backend)
 };
 
 export type OneTimeTokenResponse = {

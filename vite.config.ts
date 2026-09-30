@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+// `vitest/config` e' o `defineConfig` do Vite com a chave `test` tipada.
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
@@ -33,5 +34,11 @@ export default defineConfig({
         },
       },
     },
+  },
+  // OLC-1364: testes unitarios. O `TZ` fica fixo no script `test` (package.json) porque o
+  // calculo dos horarios do `Scheduler` depende do fuso (`getTimezoneOffset`).
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
   },
 });

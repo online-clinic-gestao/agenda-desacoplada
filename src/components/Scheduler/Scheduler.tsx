@@ -1,8 +1,17 @@
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 import { KeyboardArrowLeft, KeyboardArrowRight } from "@mui/icons-material";
-import React, { useCallback, useMemo } from "react";
+import React, { useLayoutEffect, useMemo, useRef } from "react";
 import { Appointments, Procedure, WorkingHours } from "../../types";
+import {
+  buildWorkingDaysMap,
+  findNextAvailableDate,
+  findPreviousAvailableDate,
+  generateDays,
+  getSlots,
+  SlotRules,
+} from "./schedule";
 
 type SchedulerProps = {
   onSelect: (date: Date) => void;
@@ -24,139 +33,39 @@ const Scheduler: React.FC<SchedulerProps> = ({
   maxSlotsPerDay,
 }) => {
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
-  const offset = new Date().getTimezoneOffset();
   const workingDaysMap = useMemo(
-    () =>
-      workingHours.reduce((acc: { [key: number]: WorkingHours }, curr) => {
-        acc[curr.weekday] = curr;
-        return acc;
-      }, {}),
+    () => buildWorkingDaysMap(workingHours),
     [workingHours]
   );
-
-  const getSlots = useCallback(
-    (day: Date) => {
-      // Create a copy to avoid mutating the original date
-      const dayForCalculation = new Date(day);
-      dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
-      const timeInterval = workingDaysMap[dayForCalculation.getDay()];
-      if (!timeInterval || !procedure) {
-        return [];
-      }
-      // get day in format YYYY-MM-DD
-      const date = dayForCalculation.toISOString().split("T")[0];
-      const start = new Date(`${date}T${timeInterval.start}`);
-      const end = new Date(`${date}T${timeInterval.end}`);
-      const slots: Date[] = [];
-      // OLC-1070: o horario tem de CABER inteiro no expediente, e nao so' comecar antes do
-      // fim. E' a mesma conta do backend (`slots_livres`, `slot_inicio + passo <= fim`),
-      // que confere a gravacao: com `moving < end` a tela oferecia, p.ex., 11:45 num
-      // expediente ate 12:00 com procedimento de 45min, e a rota recusava.
-      for (
-        let moving = new Date(start);
-        moving.getTime() + procedure.time * 60000 <= end.getTime();
-        moving.setMinutes(moving.getMinutes() + procedure.time)
-      ) {
-        if (moving < new Date()) continue;
-        if (
-          !appointments.some((appointment) => {
-            const appointmentStart = new Date(appointment.start);
-            const appointmentEnd = new Date(appointment.end);
-            // console.log(
-            //   "comparison",
-            //   appointmentStart.toISOString(),
-            //   " | ",
-            //   moving.toISOString(),
-            //   " | ",
-            //   appointmentEnd.toISOString()
-            // );
-            return (
-              (moving >= appointmentStart && moving < appointmentEnd) ||
-              (moving < appointmentStart &&
-                new Date(moving.getTime() + procedure.time * 60000) >
-                  appointmentStart)
-            );
-          })
-        )
-          slots.push(new Date(moving));
-      }
-
-      // OLC-1070: a clinica pode limitar quantos horarios o paciente ve por dia, para os
-      // agendamentos ficarem colados e o medico nao ficar ocioso entre um e outro.
-      //
-      // O corte e' o ULTIMO passo, sobre a lista ja filtrada: sao os N primeiros horarios
-      // LIVRES do dia. Cortar antes de remover os ocupados ofereceria horario indisponivel.
-      //
-      // Aqui, e nao no backend, porque a contagem depende da duracao do procedimento que o
-      // paciente escolheu (`procedure.time`) -- o `one-time-token` responde antes dessa
-      // escolha e so consegue delimitar uma JANELA de tempo. Com o corte aqui sao sempre N,
-      // qualquer que seja a duracao.
-      //
-      // Sem o parametro (`undefined`/`null`/<=0) nada e' cortado: a clinica que nao pediu o
-      // recurso continua vendo a grade inteira, byte a byte como antes.
-      if (maxSlotsPerDay != null && maxSlotsPerDay > 0)
-        return slots.slice(0, maxSlotsPerDay);
-
-      return slots;
-    },
-    [appointments, procedure, workingDaysMap, maxSlotsPerDay]
+  const rules: SlotRules = useMemo(
+    () => ({ workingDaysMap, appointments, procedure, maxSlotsPerDay }),
+    [workingDaysMap, appointments, procedure, maxSlotsPerDay]
   );
 
-  const findFirstAvailableDate = (date: Date) => {
-    const maxDate = new Date(date.getFullYear(), date.getMonth() + 3, 0);
-    while (date <= maxDate) {
-      const slots = getSlots(date);
-
-      if (slots.length > 0) {
-        setCurrentDate(date);
-        return date;
-      }
-      date.setDate(date.getDate() + 1);
-    }
-    return null;
-  };
-
-  const findPreviousAvailableDate = (date: Date) => {
-    const minDate = new Date(date.getFullYear(), date.getMonth() - 3, 1);
-    while (date >= minDate) {
-      const slots = getSlots(date);
-
-      if (slots.length > 0) {
-        setCurrentDate(date);
-        return date;
-      }
-      date.setDate(date.getDate() - 1);
-    }
-    return null;
-  };
-
-  const generateDays = (currentDate: Date) => {
-    const days: Date[] = [];
-    const startOfWeek = currentDate.getDate();
-    let daysAdd = 0;
-    let loopCount = 0;
-    const maxLoops = 50; // Safety limit to prevent infinite loops
-
-    for (let i = 0; i < 5 && loopCount < maxLoops; daysAdd++, loopCount++) {
-      const day = new Date(currentDate);
-      day.setDate(startOfWeek + daysAdd);
-
-      const daySlots = getSlots(new Date(day)); // Create a copy to avoid mutation
-
-      if (daySlots.length === 0) {
-        continue; // Skip days with no slots
-      }
-
-      days.push(day);
-      i++;
-    }
-
-    if (loopCount >= maxLoops) {
-      console.warn("🚨 DEBUG: generateDays hit maximum loop limit!");
-    }
-
-    return days;
-  };
+  // OLC-1364: a grade abre na PRIMEIRA data com horario livre, com a mesma busca (e o
+  // mesmo alcance) da seta ">". Antes ela abria em hoje e o `generateDays` so' olhava 50
+  // dias: medico com a 1a data livre mais longe abria com a agenda vazia.
+  //
+  // Reposiciona quando o procedimento muda (a duracao muda os horarios) ou quando a
+  // posicao atual ficou sem horario. A grade e' recarregada apos cada tentativa de
+  // agendar (`App.loadOneTimeToken`) -- ai a posicao do paciente e' mantida, se ainda
+  // tiver horario. O procedimento e' comparado por id e duracao porque a recarga troca os
+  // objetos da lista.
+  //
+  // `useLayoutEffect` para reposicionar antes da pintura: com `useEffect` a tela piscaria
+  // "Nenhum horario disponivel" (grade de hoje, vazia) antes de pular para a data livre.
+  const procedureKey = procedure ? `${procedure.id}:${procedure.time}` : null;
+  const positionedFor = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!procedureKey) return;
+    const procedureChanged = positionedFor.current !== procedureKey;
+    positionedFor.current = procedureKey;
+    setCurrentDate((current) => {
+      if (!procedureChanged && generateDays(current, rules).length > 0)
+        return current;
+      return findNextAvailableDate(new Date(), rules) ?? current;
+    });
+  }, [procedureKey, rules]);
 
   if (!procedure) return null;
 
@@ -165,6 +74,8 @@ const Scheduler: React.FC<SchedulerProps> = ({
     result.setDate(result.getDate() - days);
     return result;
   };
+
+  const days = generateDays(currentDate, rules);
 
   return (
     <Box>
@@ -179,7 +90,8 @@ const Scheduler: React.FC<SchedulerProps> = ({
           <Button
             onClick={() => {
               const newDate = subtractDays(currentDate, 1);
-              findPreviousAvailableDate(newDate);
+              const found = findPreviousAvailableDate(newDate, rules);
+              if (found) setCurrentDate(found);
             }}
           >
             <KeyboardArrowLeft />
@@ -191,7 +103,13 @@ const Scheduler: React.FC<SchedulerProps> = ({
             flexDirection: "row",
           }}
         >
-          {generateDays(currentDate).map((day, index) => (
+          {/* OLC-1364: sem horario no alcance, avisa em vez de deixar a area vazia e muda. */}
+          {days.length === 0 && (
+            <Typography sx={{ p: 2, alignSelf: "center" }}>
+              Nenhum horário disponível
+            </Typography>
+          )}
+          {days.map((day, index) => (
             <Box
               key={index}
               sx={{
@@ -224,7 +142,7 @@ const Scheduler: React.FC<SchedulerProps> = ({
                 }
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column" }}>
-                {getSlots(day).map((slot, slotIndex) => (
+                {getSlots(day, rules).map((slot, slotIndex) => (
                   <Button
                     key={slotIndex}
                     sx={{
@@ -255,8 +173,8 @@ const Scheduler: React.FC<SchedulerProps> = ({
           <Button
             onClick={() => {
               const newDate = subtractDays(currentDate, -1);
-
-              findFirstAvailableDate(newDate);
+              const found = findNextAvailableDate(newDate, rules);
+              if (found) setCurrentDate(found);
             }}
           >
             <KeyboardArrowRight />

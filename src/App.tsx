@@ -394,7 +394,11 @@ const App: React.FC<AppProps> = ({
             <React.Fragment>
               <Box sx={{ mt: 2, mb: 1, py: 1 }}>
                 {activeStep === 0 ? <PersonalData /> : null}
-                {activeStep === 1 ? <ExamData /> : null}
+                {/* OLC-1364: chamado como funcao, e nao como `<ExamData />`. Por ser declarado
+                    dentro do `App`, como componente ele seria um tipo NOVO a cada render: o React
+                    remontaria o `Scheduler` e a agenda voltaria para a 1a data livre sempre que o
+                    paciente escolhesse um horario ou a grade fosse recarregada. Nao tem hooks. */}
+                {activeStep === 1 ? ExamData() : null}
                 {activeStep === 2 ? <ReviewStep /> : null}
               </Box>
               <Box sx={{ display: "flex", flexDirection: "row", pt: 2 }}>
