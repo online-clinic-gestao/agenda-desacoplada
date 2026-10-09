@@ -32,4 +32,8 @@ export type OneTimeTokenResponse = {
   // caso de toda clinica que nao configurou o recurso -- a tela segue mostrando a grade
   // inteira, exatamente como antes.
   max_slots_per_day?: number | null;
+  // OLC-1028: faixa etaria que o medico atende (anos inteiros, inclusiva). Ausente ou null
+  // = sem limite daquele lado -- o caso de todo medico que a clinica nao configurou.
+  min_age?: number | null;
+  max_age?: number | null;
 };

@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import axios from "axios";
+import Swal, { SweetAlertResult } from "sweetalert2";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { OneTimeTokenResponse } from "./types";
@@ -58,5 +59,60 @@ describe("App + Scheduler (OLC-1364)", () => {
 
     expect(column(/30 de set/)).toBeInTheDocument();
     expect(column(/28 de set/)).not.toBeInTheDocument();
+  });
+});
+
+describe("App: faixa etaria (OLC-1028)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const startWith = async (token: OneTimeTokenResponse, birthDate: string) => {
+    vi.spyOn(axios, "post").mockResolvedValue({ data: token });
+    render(<App />);
+    await act(async () => {});
+    fireEvent.change(screen.getByLabelText("Data de nascimento"), {
+      target: { value: birthDate },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Avançar" }));
+  };
+
+  it("pede a data de nascimento em toda clinica", async () => {
+    vi.spyOn(axios, "post").mockResolvedValue({ data: TOKEN });
+    render(<App />);
+    await act(async () => {});
+
+    expect(screen.getByLabelText("Data de nascimento")).toHaveAttribute("type", "date");
+  });
+
+  it("quem nao cabe na faixa em nenhum dia da agenda para nos dados pessoais", async () => {
+    // O SweetAlert2 precisa de `matchMedia`, que o jsdom nao tem: confere a chamada.
+    const fire = vi
+      .spyOn(Swal, "fire")
+      .mockResolvedValue({ isConfirmed: true } as SweetAlertResult);
+
+    await startWith({ ...TOKEN, min_age: null, max_age: 12 }, "2000-01-01");
+
+    expect(fire).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "Este profissional atende pacientes até 12 anos. Para este caso, entre em contato com a clínica.",
+      })
+    );
+    expect(screen.getByLabelText("Data de nascimento")).toBeInTheDocument();
+  });
+
+  it("sem faixa configurada qualquer idade segue para o agendamento", async () => {
+    const fire = vi.spyOn(Swal, "fire");
+
+    await startWith(TOKEN, "1940-01-01");
+
+    expect(fire).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Data de nascimento")).not.toBeInTheDocument();
   });
 });
