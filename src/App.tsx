@@ -21,6 +21,16 @@ import { Api } from "./api";
 import { Appointments, HealthOperator, Procedure, WorkingHours } from "./types";
 import Swal from "sweetalert2";
 import { CONFIG } from "./config";
+import {
+  AgeRange,
+  ageOn,
+  ageRangeMessage,
+  hasAgeRange,
+  isOutOfRangeForWholeWindow,
+  isPersonalDataRejection,
+  isWithinAgeRange,
+  parseBirthDate,
+} from "./age";
 
 const steps = ["Dados Pessoais", "Agendamento", "Conclusão"];
 export type AppProps = {
@@ -68,6 +78,7 @@ const App: React.FC<AppProps> = ({
       name: "",
       phone: "",
       email: "",
+      birth_date: "",
       procedure: "",
       health_operator: "",
     },
@@ -84,6 +95,8 @@ const App: React.FC<AppProps> = ({
   // OLC-1070: quantos horarios oferecer por dia. `null` = sem limite (clinica sem o
   // parametro configurado), e a tela segue mostrando a grade inteira.
   const [maxSlotsPerDay, setMaxSlotsPerDay] = useState<number | null>(null);
+  // OLC-1028: faixa etaria do medico; `null` nos dois lados = sem restricao.
+  const [ageRange, setAgeRange] = useState<AgeRange>({ min: null, max: null });
   const [selectedSlot, setSelectedSlot] = useState<Date | null>(null);
   const [completed, setCompleted] = useState<{
     [k: number]: boolean;
@@ -152,11 +165,29 @@ const App: React.FC<AppProps> = ({
       setWorkingHours(response.working_hours);
       setAppointments(response.appointments);
       setMaxSlotsPerDay(response.max_slots_per_day ?? null);
+      setAgeRange({ min: response.min_age ?? null, max: response.max_age ?? null });
     });
+  };
+
+  // OLC-1028: recusa (e devolve o paciente aos dados pessoais) quem esta fora da faixa.
+  const rejectAge = () => {
+    Swal.fire({
+      title: "Não foi possível realizar o agendamento",
+      text: ageRangeMessage(ageRange),
+      icon: "error",
+      confirmButtonText: "Fechar",
+    });
+    setActiveStep(0);
   };
 
   const create = (data: any) => {
     if (selectedSlot === null) return;
+    // OLC-1028: idade na DATA DA CONSULTA, a mesma conta que a rota faz e que decide.
+    const birth = parseBirthDate(data.birth_date);
+    if (birth && hasAgeRange(ageRange) && !isWithinAgeRange(ageOn(birth, selectedSlot), ageRange)) {
+      rejectAge();
+      return;
+    }
     const b = new Date(selectedSlot);
     const offset = new Date().getTimezoneOffset();
     b.setMinutes(b.getMinutes() - offset);
@@ -196,7 +227,11 @@ const App: React.FC<AppProps> = ({
         // Recarrega sempre; na recusa (400) o horario escolhido deixa de valer e o
         // paciente volta para o passo "Agendamento" para escolher outro.
         loadOneTimeToken();
-        if (isRejected) {
+        if (isRejected && isPersonalDataRejection(data)) {
+          // OLC-1028: recusa pela idade/nascimento -- o horario continua valendo, o que
+          // precisa mudar sao os dados pessoais.
+          setActiveStep(0);
+        } else if (isRejected) {
           setSelectedSlot(null);
           setActiveStep(1);
         }
@@ -205,6 +240,16 @@ const App: React.FC<AppProps> = ({
 
   const handleComplete = () => {
     trigger();
+
+    // OLC-1028: quem nao cabe na faixa em NENHUM dia que a agenda oferece nem chega a
+    // escolher horario. Os demais seguem; a conta exata e' feita no envio.
+    if (activeStep === 0 && hasAgeRange(ageRange)) {
+      const birth = parseBirthDate(getValues().birth_date);
+      if (birth && isOutOfRangeForWholeWindow(birth, ageRange, new Date())) {
+        rejectAge();
+        return;
+      }
+    }
 
     if (completedSteps() === totalSteps() - 1 && activeStep === 2) {
       if (Object.keys(errors).length > 0 || !selectedSlot) {
@@ -274,6 +319,22 @@ const App: React.FC<AppProps> = ({
           />
           <Typography variant="subtitle2" color="red" sx={{ ml: 0, mt: 1 }}>
             {errors.email?.message}
+          </Typography>
+        </FormControl>
+        <FormControl fullWidth sx={{ m: 1 }}>
+          <TextField
+            {...register("birth_date")}
+            type="date"
+            label="Data de nascimento"
+            variant="outlined"
+            error={errors.birth_date ? true : false}
+            slotProps={{
+              inputLabel: { shrink: true },
+              htmlInput: { max: new Date().toLocaleDateString("sv-SE") },
+            }}
+          />
+          <Typography variant="subtitle2" color="red" sx={{ ml: 0, mt: 1 }}>
+            {errors.birth_date?.message}
           </Typography>
         </FormControl>
       </Box>
@@ -349,6 +410,9 @@ const App: React.FC<AppProps> = ({
           <strong>Telefone:</strong> {getValues().phone}
           <br />
           <strong>Email:</strong> {getValues().email}
+          <br />
+          <strong>Data de nascimento:</strong>{" "}
+          {parseBirthDate(getValues().birth_date)?.toLocaleDateString("pt-BR")}
           <br />
           <strong>Procedimento:</strong> {procedure?.name}
           <br />
