@@ -18,7 +18,7 @@ import schema from "./validation";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { useHookFormMask } from "use-mask-input";
 import { Api } from "./api";
-import { Appointments, HealthOperator, Procedure, WorkingHours } from "./types";
+import { Appointments, ExtraDate, HealthOperator, Procedure, WorkingHours } from "./types";
 import Swal from "sweetalert2";
 import { CONFIG } from "./config";
 import {
@@ -91,6 +91,8 @@ const App: React.FC<AppProps> = ({
   const [procedures, setProcedures] = useState<Procedure[]>([]);
   const [healthOperators, setHealthOperators] = useState<HealthOperator[]>([]);
   const [workingHours, setWorkingHours] = useState<WorkingHours[]>([]);
+  // OLC-1373: datas adicionais de atendimento. Backend antigo nao manda: lista vazia.
+  const [extraDates, setExtraDates] = useState<ExtraDate[]>([]);
   const [appointments, setAppointments] = useState<Appointments[]>([]);
   // OLC-1070: quantos horarios oferecer por dia. `null` = sem limite (clinica sem o
   // parametro configurado), e a tela segue mostrando a grade inteira.
@@ -151,6 +153,7 @@ const App: React.FC<AppProps> = ({
     setSelectedSlot(null);
     setHealthOperators([]);
     setWorkingHours([]);
+    setExtraDates([]);
     setAppointments([]);
     reset();
   };
@@ -163,6 +166,7 @@ const App: React.FC<AppProps> = ({
       setToken(response.access_token);
       setProcedures(response.procedures);
       setWorkingHours(response.working_hours);
+      setExtraDates(response.extra_dates ?? []);
       setAppointments(response.appointments);
       setMaxSlotsPerDay(response.max_slots_per_day ?? null);
       setAgeRange({ min: response.min_age ?? null, max: response.max_age ?? null });
@@ -387,6 +391,7 @@ const App: React.FC<AppProps> = ({
           procedure={procedure}
           selectedSlot={selectedSlot}
           maxSlotsPerDay={maxSlotsPerDay}
+          extraDates={extraDates}
         />
       </>
     );
@@ -416,7 +421,8 @@ const App: React.FC<AppProps> = ({
           <br />
           <strong>Procedimento:</strong> {procedure?.name}
           <br />
-          <strong>Convênio:</strong> {healthOperator}
+          <strong>Convênio:</strong>{" "}
+          {healthOperators.find((operator) => operator.id == healthOperator)?.name}
           <br />
           <strong>Data:</strong> {selectedSlot?.toLocaleDateString("pt-BR")} às{" "}
           {slot}
