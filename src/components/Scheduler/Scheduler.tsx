@@ -3,7 +3,7 @@ import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
 import { KeyboardArrowLeft, KeyboardArrowRight } from "@mui/icons-material";
 import React, { useLayoutEffect, useMemo, useRef } from "react";
-import { Appointments, Procedure, WorkingHours } from "../../types";
+import { Appointments, ExtraDate, Procedure, WorkingHours } from "../../types";
 import {
   buildWorkingDaysMap,
   findNextAvailableDate,
@@ -22,6 +22,8 @@ type SchedulerProps = {
   // OLC-1070: quantos horarios oferecer por dia. `undefined`/`null`/<=0 = sem limite, que
   // e' o caso de toda clinica que nao configurou o recurso.
   maxSlotsPerDay?: number | null;
+  // OLC-1373: datas adicionais de atendimento (`extra_dates` do token).
+  extraDates?: ExtraDate[];
 };
 
 const Scheduler: React.FC<SchedulerProps> = ({
@@ -31,6 +33,7 @@ const Scheduler: React.FC<SchedulerProps> = ({
   procedure,
   selectedSlot,
   maxSlotsPerDay,
+  extraDates,
 }) => {
   const [currentDate, setCurrentDate] = React.useState<Date>(new Date());
   const workingDaysMap = useMemo(
@@ -38,8 +41,8 @@ const Scheduler: React.FC<SchedulerProps> = ({
     [workingHours]
   );
   const rules: SlotRules = useMemo(
-    () => ({ workingDaysMap, appointments, procedure, maxSlotsPerDay }),
-    [workingDaysMap, appointments, procedure, maxSlotsPerDay]
+    () => ({ workingDaysMap, appointments, procedure, maxSlotsPerDay, extraDates }),
+    [workingDaysMap, appointments, procedure, maxSlotsPerDay, extraDates]
   );
 
   // OLC-1364: a grade abre na PRIMEIRA data com horario livre, com a mesma busca (e o

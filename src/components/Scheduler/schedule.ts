@@ -1,4 +1,4 @@
-import { Appointments, Procedure, WorkingHours } from "../../types";
+import { Appointments, ExtraDate, Procedure, WorkingHours } from "../../types";
 
 // OLC-1364: as contas da grade saem do `Scheduler` para funcoes PURAS -- sem `setState` e
 // sem mutar a data recebida --, para que a abertura da tela e as setas usem exatamente a
@@ -14,6 +14,8 @@ export type SlotRules = {
   maxSlotsPerDay?: number | null;
   // "Agora". So' os testes informam; na tela e' sempre o relogio.
   now?: Date;
+  // OLC-1373: datas adicionais de atendimento (`extra_dates` do token). Ausente = nenhuma.
+  extraDates?: ExtraDate[];
 };
 
 // Limite de dias que o `generateDays` percorre procurando 5 dias com horario.
@@ -59,39 +61,56 @@ export const getSlots = (day: Date, rules: SlotRules): Date[] => {
   // Create a copy to avoid mutating the original date
   const dayForCalculation = new Date(day);
   dayForCalculation.setMinutes(dayForCalculation.getMinutes() - offset);
-  const timeInterval = workingDaysMap[dayForCalculation.getDay()];
-  if (!timeInterval || !procedure) {
-    return [];
-  }
+  if (!procedure) return [];
   // get day in format YYYY-MM-DD
   const date = dayForCalculation.toISOString().split("T")[0];
-  const start = new Date(`${date}T${timeInterval.start}`);
-  const end = new Date(`${date}T${timeInterval.end}`);
-  const slots: Date[] = [];
-  // OLC-1070: o horario tem de CABER inteiro no expediente, e nao so' comecar antes do
-  // fim. E' a mesma conta do backend (`slots_livres`, `slot_inicio + passo <= fim`),
-  // que confere a gravacao: com `moving < end` a tela oferecia, p.ex., 11:45 num
-  // expediente ate 12:00 com procedimento de 45min, e a rota recusava.
-  for (
-    let moving = new Date(start);
-    moving.getTime() + procedure.time * 60000 <= end.getTime();
-    moving.setMinutes(moving.getMinutes() + procedure.time)
-  ) {
-    if (moving < now) continue;
-    if (
-      !appointments.some((appointment) => {
-        const appointmentStart = new Date(appointment.start);
-        const appointmentEnd = new Date(appointment.end);
-        return (
-          (moving >= appointmentStart && moving < appointmentEnd) ||
-          (moving < appointmentStart &&
-            new Date(moving.getTime() + procedure.time * 60000) >
-              appointmentStart)
-        );
-      })
-    )
-      slots.push(new Date(moving));
+  // OLC-1373: as faixas do dia sao a semanal (se o dia da semana e' atendido) MAIS as das
+  // datas adicionais daquela data -- soma, nao substitui. E' a mesma conta do backend
+  // (`faixas_do_dia` + `horario_dentro_da_oferta`), que confere a gravacao: cada faixa gera
+  // a sua grade a partir do proprio inicio, horario repetido sai uma vez so' e o corte de
+  // N (abaixo) vale sobre a uniao ordenada.
+  const intervals: { start: string; end: string }[] = [];
+  // OLC-1373 (code review): o dia da semana sai de `day`, no horario local -- o mesmo dia
+  // de `date`. `dayForCalculation` (menos o offset) caia no dia ANTERIOR quando a tela era
+  // aberta entre 00:00 e 02:59, e a faixa de segunda aparecia na terca (com data adicional
+  // na terca, a gravacao passaria a aceitar esses horarios).
+  const timeInterval = workingDaysMap[day.getDay()];
+  if (timeInterval) intervals.push(timeInterval);
+  for (const extra of rules.extraDates ?? []) {
+    if (extra.date === date) intervals.push(extra);
   }
+  if (intervals.length === 0) return [];
+
+  const offered = new Map<number, Date>();
+  for (const interval of intervals) {
+    const start = new Date(`${date}T${interval.start}`);
+    const end = new Date(`${date}T${interval.end}`);
+    // OLC-1070: o horario tem de CABER inteiro no expediente, e nao so' comecar antes do
+    // fim. E' a mesma conta do backend (`slots_livres`, `slot_inicio + passo <= fim`),
+    // que confere a gravacao: com `moving < end` a tela oferecia, p.ex., 11:45 num
+    // expediente ate 12:00 com procedimento de 45min, e a rota recusava.
+    for (
+      let moving = new Date(start);
+      moving.getTime() + procedure.time * 60000 <= end.getTime();
+      moving.setMinutes(moving.getMinutes() + procedure.time)
+    ) {
+      if (moving < now) continue;
+      if (
+        !appointments.some((appointment) => {
+          const appointmentStart = new Date(appointment.start);
+          const appointmentEnd = new Date(appointment.end);
+          return (
+            (moving >= appointmentStart && moving < appointmentEnd) ||
+            (moving < appointmentStart &&
+              new Date(moving.getTime() + procedure.time * 60000) >
+                appointmentStart)
+          );
+        })
+      )
+        offered.set(moving.getTime(), new Date(moving));
+    }
+  }
+  const slots = [...offered.values()].sort((a, b) => a.getTime() - b.getTime());
 
   // OLC-1070: a clinica pode limitar quantos horarios o paciente ve por dia, para os
   // agendamentos ficarem colados e o medico nao ficar ocioso entre um e outro.
