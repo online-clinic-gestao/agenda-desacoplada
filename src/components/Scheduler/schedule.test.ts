@@ -238,3 +238,104 @@ describe("findPreviousAvailableDate (seta <)", () => {
     expect(from).toEqual(at(2026, 10, 7));
   });
 });
+
+// OLC-1373: data adicional de atendimento -- uma data (e faixa) alem do horario semanal.
+// Mesma conta do backend (`faixas_do_dia` + `horario_dentro_da_oferta`): soma, cada faixa
+// a partir do proprio inicio, corte de N sobre a uniao ordenada.
+describe("datas adicionais (extra_dates)", () => {
+  const WEDNESDAY_2026_09_30 = at(2026, 9, 30);
+  const WEDNESDAY_2026_10_07 = at(2026, 10, 7);
+  const extra = (date: string, start = "14:00:00", end = "15:00:00") => ({ date, start, end });
+
+  it("abre a data num dia da semana sem atendimento", () => {
+    const rules = rulesFor([expedient(MONDAY)], { extraDates: [extra("2026-09-30")] });
+
+    expect(hhmm(getSlots(WEDNESDAY_2026_09_30, rules))).toEqual(["14:00", "14:30"]);
+  });
+
+  it("nao abre o mesmo dia da semana seguinte", () => {
+    const rules = rulesFor([expedient(MONDAY)], { extraDates: [extra("2026-09-30")] });
+
+    expect(getSlots(WEDNESDAY_2026_10_07, rules)).toEqual([]);
+  });
+
+  it("soma com a faixa semanal do dia", () => {
+    const rules = rulesFor([expedient(MONDAY)], { extraDates: [extra("2026-09-28")] });
+
+    expect(hhmm(getSlots(MONDAY_2026_09_28, rules))).toEqual([
+      "08:00",
+      "08:30",
+      "09:00",
+      "09:30",
+      "14:00",
+      "14:30",
+    ]);
+  });
+
+  it("varias faixas na mesma data saem em ordem e sem repetir", () => {
+    const rules = rulesFor([], {
+      extraDates: [
+        extra("2026-09-30", "14:00:00", "15:00:00"),
+        extra("2026-09-30", "08:00:00", "09:00:00"),
+        extra("2026-09-30", "08:30:00", "09:00:00"),
+      ],
+    });
+
+    expect(hhmm(getSlots(WEDNESDAY_2026_09_30, rules))).toEqual([
+      "08:00",
+      "08:30",
+      "14:00",
+      "14:30",
+    ]);
+  });
+
+  it("o limite por dia vale sobre a uniao ordenada", () => {
+    // A data adicional (07h) vem ANTES da semanal (08h): cortar antes de ordenar daria
+    // 08:00, 08:30, 09:00.
+    const rules = rulesFor([expedient(MONDAY)], {
+      extraDates: [extra("2026-09-28", "07:00:00", "08:00:00")],
+      maxSlotsPerDay: 3,
+    });
+
+    expect(hhmm(getSlots(MONDAY_2026_09_28, rules))).toEqual(["07:00", "07:30", "08:00"]);
+  });
+
+  it("de madrugada o dia da semana continua o da data", () => {
+    // Code review: entre 00:00 e 02:59 o dia da semana era o anterior -- a faixa de segunda
+    // aparecia na terca.
+    const madrugada = at(2026, 9, 29, 1, 30); // terca, 01:30
+    const rules = rulesFor([expedient(MONDAY)], {
+      extraDates: [extra("2026-09-29")],
+      now: at(2026, 9, 28, 23, 0),
+    });
+
+    expect(hhmm(getSlots(madrugada, rules))).toEqual(["14:00", "14:30"]);
+    expect(hhmm(getSlots(at(2026, 9, 28, 1, 30), rules))).toEqual([]);
+  });
+
+  it("ocupado tambem sai da data adicional", () => {
+    const rules = rulesFor([], {
+      extraDates: [extra("2026-09-30")],
+      appointments: [{ start: "2026-09-30T14:00:00", end: "2026-09-30T14:30:00" }],
+    });
+
+    expect(hhmm(getSlots(WEDNESDAY_2026_09_30, rules))).toEqual(["14:30"]);
+  });
+
+  it("sem extra_dates nada muda", () => {
+    const comCampoVazio = rulesFor([expedient(MONDAY)], { extraDates: [] });
+    const semCampo = rulesFor([expedient(MONDAY)]);
+
+    expect(getSlots(MONDAY_2026_09_28, comCampoVazio)).toEqual(
+      getSlots(MONDAY_2026_09_28, semCampo)
+    );
+    expect(getSlots(WEDNESDAY_2026_09_30, semCampo)).toEqual([]);
+  });
+
+  it("a busca de dias encontra a data adicional", () => {
+    const rules = rulesFor([], { extraDates: [extra("2026-09-30")] });
+
+    expect(ymd(generateDays(NOW, rules))).toEqual(["2026-09-30"]);
+    expect(ymd([findNextAvailableDate(NOW, rules) as Date])).toEqual(["2026-09-30"]);
+  });
+});
